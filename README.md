@@ -1,5 +1,7 @@
 # Note: this is a fork of Miexil's Pangdate project; all essential gameplay is their work, only the playlink multiplayer functionality has been added. Miexil appears inactive, but if they object to this fork it will be taken down.
 
+[![Demo Video](https://img.youtube.com/vi/YOUTUBE_VIDEO_ID_HERE/0.jpg)](https://www.youtube.com/watch?v=YOUTUBE_VIDEO_ID_HERE)
+
 # pang-date
 A remake of the classic early 70's game for the Playdate console !
 
