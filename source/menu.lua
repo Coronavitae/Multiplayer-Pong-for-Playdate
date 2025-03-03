@@ -9,7 +9,7 @@ local selectorRadius = 8
 local levelLabels = {'Human', 'AI - Easy', 'AI - Medium', 'AI - Hard'}
 
 local p1Selection, p2Selection = 1, 3
-local cursorOptions = {'player1', 'player2', 'start'}
+local cursorOptions = {'player1', 'player2', 'start', 'playlink'}
 local cursorSelected = 3
 
 local pangLogo = nil
@@ -83,22 +83,31 @@ function drawOptions()
   drawP2DifficultySelector(levelLabels[p2Selection], centerX + 50, centerY + 40)
 
   if (cursorOptions[cursorSelected] == 'start') then
-    gfx.fillRect(centerX - 52, centerY + 88, 104, 22)
+    gfx.fillRect(centerX - 52, centerY + 63, 104, 22)
   end
-  gfx.drawTextAligned('*START GAME*', centerX, centerY + 90,
+  
+  if (cursorOptions[cursorSelected] == 'playlink') then
+    gfx.fillRect(centerX - 67, centerY + 88, 134, 22)
+  end
+  
+  gfx.drawTextAligned('*START GAME*', centerX, centerY + 65,
                       kTextAlignment.center)
+                      
+  gfx.drawTextAligned('*START PLAYLINK*', centerX, centerY + 90,
+                      kTextAlignment.center)
+  
 end
 
 function cursorPrev()
   if cursorSelected == 1 then
-    cursorSelected = 3
+    cursorSelected = 4
   else
     cursorSelected = cursorSelected - 1
   end
 end
 
 function cursorNext()
-  if cursorSelected == 3 then
+  if cursorSelected == 4 then
     cursorSelected = 1
   else
     cursorSelected = cursorSelected + 1
@@ -158,7 +167,15 @@ function handleInput()
     if cursorSelected == 3 then
       removeAssets()
       setupGameAndStart(p1Selection, p2Selection)
+    elseif cursorSelected == 4 then
+      playlinkInput = 0
+      removeAssets()
+      setupGameAndStart(1, 5)
+      print("Playlink Game Started")
+      playlink = true
+      waitingForPlaylink = true
     end
+    
   end
 end
 
