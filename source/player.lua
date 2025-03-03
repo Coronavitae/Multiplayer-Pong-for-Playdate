@@ -127,3 +127,27 @@ function Computer:handleMovement(vx, vy, ballSprite)
     self.speed = self.minSpeed
   end
 end
+
+class('Playlink').extends(Human)
+
+function Playlink:handleMovement()
+  
+  
+  if (playlinkInput> 0) then
+    self:moveBy(0, playlinkInput, 'down')
+    
+  elseif (playlinkInput < 0) then
+    self:moveBy(0, playlinkInput, 'up')
+  end
+  
+  playlinkInput = 0
+  
+  
+end
+
+class('Dummy').extends(Playlink)
+
+function Dummy:handleMovement()
+  self.setStartPosition(self, self.x, self.y)
+end
+

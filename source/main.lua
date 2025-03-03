@@ -11,6 +11,11 @@ local dsp<const> = playdate.display
 local centerX<const> = dsp.getWidth() / 2
 local centerY<const> = dsp.getHeight() / 2
 local playerSpriteHeight<const> = 50
+playdate.display.setRefreshRate(50)
+executeFrame = true --used to cycle frames to allow more time for serial processing
+
+roundPause = 0 --out of place definition for Playlink multiplayer
+gameOver = 0 --out of place definition for Playlink multiplayer
 
 fieldBoundary = 30
 maxGameSpeed = 6
@@ -59,11 +64,15 @@ function setupGameAndStart(p1Dif, p2Dif)
     p2 = Computer(1, 20, "images/plong-player", 395, centerY, 15, 2) -- MEDIUM
   elseif p2Dif == 4 then
     p2 = Computer(1, 35, "images/plong-player", 395, centerY, 10, 2) -- HARD
+  elseif p2Dif == 5 then
+    p2 = Playlink(1, 15, "images/plong-player", 395, centerY)
   end
 
   gameReady = true
   ballSprite = gfx.sprite.new(gfx.image.new("images/plong-ball"))
   ballSprite:setCollideRect(0, 0, ballSprite:getSize())
+  ballSprite.x = centerX --added for Playlink
+  ballSprite.y = centerY --added for Playlink
   ballSprite:add()
   resetBall()
 end
@@ -72,6 +81,7 @@ function resetBall()
   vx = maxGameSpeed * (math.random(0, 1) == 0 and 1 or -1)
   vy = math.random(3, maxGameSpeed) * (math.random(0, 1) == 0 and 1 or -1)
   ballSprite:moveTo(centerX, centerY)
+  
 end
 
 function moveBall() ballSprite:moveTo(ballSprite.x + vx, ballSprite.y + vy) end
@@ -126,6 +136,7 @@ function resetRound()
   gfx.sprite.update()
   drawScore()
   gfx.drawText('*Round ' .. round .. '*', centerX - 30, centerY + 50)
+  print("msg roundpause="..round)
   playdate.wait(1500)
 end
 
@@ -150,10 +161,15 @@ function checkEndGame()
     gfx.sprite.update()
     drawScore()
     gameReady = false
-    if p1.score == 3 then
+    if p1.score == p2.score then
+      gfx.drawText('*Draw!*', centerX - 30, centerY + 50)
+      print("msg gameover=3") --tells other playdate a draw has occurred
+    elseif p1.score > p2.score then
       gfx.drawText('*P1 wins!*', centerX - 30, centerY + 50)
+      print("msg gameover=1") --tells other playdate p1 has won
     else
       gfx.drawText('*P2 wins!*', centerX - 30, centerY + 50)
+      print("msg gameover=2") --tells other playdate p2 has won
     end
     playdate.wait(2500)
     cleanUp()
@@ -187,18 +203,160 @@ function gameLoop()
   if (round == 0) then
     round = round + 1
     gfx.drawText('*Round ' .. round .. '*', centerX - 30, centerY + 50)
+    print("msg roundpause="..round)
     playdate.wait(1500)
   end
   drawFieldSeparator()
 end
 
+playlink = false
+
 function playdate.update()
-  if (gameReady) then
-    gameLoop()
+  if ((playlink == false) or (isHost == true)) then
+    if (gameReady) then
+      if executeFrame == true then
+        gameLoop()
+        executeFrame = false
+      else
+      --transmit gamestate
+        if playlink == true then
+          print("msg gamestate="..p1.sprite.y..","..p2.sprite.y..","
+            ..ballSprite.x..","..ballSprite.y..","..p1.score..","..p2.score)
+        end
+        executeFrame = true
+      end
+      
+      else
+      gameMenu()
+    end
+    
+    
   else
-    gameMenu()
+    --playlink connection loop
+    if executeFrame == true then
+      local p2Crank, _ = playdate.getCrankChange()
+      print("msg "..p2Crank)
+      executeFrame = false
+    else
+      if gamestateTable ~= nil then
+        p1.y = gamestateTable[1]
+        p2.y = gamestateTable[2]
+        ballSprite.x = gamestateTable[3]
+        ballSprite.y = gamestateTable[4]
+        p1.score = gamestateTable[5]
+        p2.score = gamestateTable[6]
+      end
+      p1:handleMovement()
+      p2:handleMovement()
+      ballSprite:moveTo(ballSprite.x,ballSprite.y)
+      gfx.sprite.update()
+      gfx.drawText(p1.score, centerX - (centerX / 2), 5)
+      gfx.drawText(p2.score, centerX + (centerX / 2), 5)
+      if ((roundPause == 0) and (gameOver == 0)) then
+        drawFieldSeparator()
+      end
+      --playlink draw playfield
+      executeFrame = true
+    end
+    
+    if tonumber(roundPause) > 0 then
+      gfx.pushContext()
+        gfx.setImageDrawMode(playdate.graphics.kDrawModeCopy)
+        gfx.drawText('*Round ' .. roundPause .. '*', centerX - 30, centerY + 50)
+      gfx.popContext()
+    elseif tonumber(gameOver) > 0 then
+      gfx.pushContext()
+        gfx.setImageDrawMode(playdate.graphics.kDrawModeCopy)
+        local displayText = "error, gameover ="..gameOver
+        if gameOver == "3" then
+          displayText = "*Draw!*"
+        elseif gameOver == "1" then
+          displayText = "*P1 wins!*"
+        elseif gameOver == "2" then
+          displayText = "*P2 wins!*"
+        end
+        gfx.drawText(displayText, centerX - 30, centerY + 50)
+        
+      gfx.popContext()
+    end
+    
+  
   end
-  -- playdate.drawFPS(0,0)
+  --playdate.drawFPS(0,0)
+end
+
+
+--needed for parsing serial input:
+--mysplit makes it possible to split variable 
+--values out of a single serial message
+function mysplit(inputstr, sep)
+  if sep == nil then
+    sep = "%s"
+  end
+  local t = {}
+  for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+    table.insert(t, str)
+  end
+  return t
+end
+
+--string.starts makes it possible to check if 
+--a message starts with a certain code
+function string.starts(String,Start)
+   return string.sub(String,1,string.len(Start))==Start
+end
+
+--second function 
+function playdate.serialMessageReceived(message)
+  
+  
+  if message == "host" then
+    isHost = true
+    playlink = true
+    
+  elseif message == "client" then
+    isHost = false
+    playlink = true
+    removeAssets()
+    p1 = Dummy(1, 15, "images/plong-player", 5, centerY)
+    p1.x, p1.y = 5, centerY
+    p1.score = 0
+    p2 = Dummy(1, 15, "images/plong-player", 395, centerY)
+    p2.x, p2.y = 395, centerY
+    p2.score = 0
+    ballSprite = gfx.sprite.new(gfx.image.new("images/plong-ball"))
+    ballSprite.x = 200
+    ballSprite.y = 120
+    ballSprite:add()
+    ballSprite:moveTo(ballSprite.x,ballSprite.y)
+  elseif message == "ping" then
+    
+  elseif isHost == true then
+    local integer_message = tonumber(message)
+    if integer_message then
+      playlinkInput = integer_message
+    end
+    
+    
+  elseif playlink == true then
+    if string.starts(message,"gamestate=") then
+      roundPause = 0
+      gameOver = 0
+      local gamestate = string.sub(message, string.len("gamestate=")+1, string.len(message))
+      --print(gamestate)
+      gamestateTable = mysplit(gamestate,",")
+      --print("gamestate is "..gamestateTable[1]..","..gamestateTable[2]..","..gamestateTable[3].."c"..gamestateTable[4])
+    elseif string.starts(message,"roundpause=") then  
+      roundPause = string.sub(message, string.len("roundpause=")+1, string.len(message))
+    elseif string.starts(message,"gameover=") then
+      gameOver = string.sub(message, string.len("gameover=")+1, string.len(message))
+    end
+    
+  end
+  
+  --print("playlinInput now = ", playlinkInput)
+  
+  
 end
 
 init()
