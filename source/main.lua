@@ -214,7 +214,7 @@ end
 playlink = false
 
 function playdate.update()
-  print("playlink =",playlink,"and waiting=",waitingForPlaylink)
+  
   if ((playlink == false) or ((isHost == true) and (waitingForPlaylink == false))) then
     if (gameReady) then
       if executeFrame == true then
@@ -334,6 +334,7 @@ function playdate.serialMessageReceived(message)
   elseif message == "client" then
     isHost = false
     playlink = true
+    waitingForPlaylink = true
     cleanUp()
     removeAssets()
     
